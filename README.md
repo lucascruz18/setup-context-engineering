@@ -14,6 +14,22 @@ codebase doesn't really follow. This skill instead **discovers** the repo's real
 keep an agent honest. It is built for **brownfield** projects: existing, running code that you
 want an agent to work in safely.
 
+## When to use it
+
+Use this when a repository is too real for a generic `CLAUDE.md`:
+
+- a brownfield app with conventions that live in people's heads;
+- a monorepo or multi-stack repo where backend, frontend, CMS, scripts, and infra each have
+  different rules;
+- a team adopting spec-driven development but still missing the repo-specific operating layer
+  agents need before editing code;
+- a project where agent output must respect existing architecture, tests, naming, and delivery
+  workflow instead of inventing a new one.
+
+It works especially well as the first step before asking agents to implement features in mixed
+repositories: it maps the terrain, then turns that map into reusable rules, memory, prompts, and
+gates.
+
 ## What it generates (in the target project)
 
 ```
@@ -32,6 +48,44 @@ target-project/
     ├── skills/pr-review/SKILL.md  # 6-subagent code reviewer
     └── scripts/validate-setup.sh  # deterministic self-check
 ```
+
+## Before / After
+
+| Before | After |
+| --- | --- |
+| "Read the repo and be careful." | `AGENTS.md` explains how agents must operate in this specific codebase. |
+| Generic rules copied from another project. | `.claude/rules/` contains observed conventions with `path:line` evidence. |
+| Specs, prompts, memory, and decisions scattered across chat history. | `specs/`, `memory/`, and `.claude/prompts/` create a repeatable workflow. |
+| Agents run edits without knowing the quality gates. | Stack-aware hooks and `memory/docs/TESTING.md` document lint, typecheck, and test commands. |
+| PR review depends on one model reading everything. | A generated `pr-review` skill splits review across Security, Requirements, Tests, Architecture, Regression, and Performance. |
+
+## Example: mixed-stack repo
+
+For a repo with multiple stacks, the skill first classifies the shape of the project instead of
+assuming one global convention:
+
+```txt
+project/
+├── apps/web/              # React / Next / Vite frontend
+├── apps/api/              # Node / Rails / Python / Go backend
+├── cms/                   # AEM, CMS, or platform-specific layer
+├── packages/shared/       # shared types, utils, contracts
+└── scripts/               # automation and release tooling
+```
+
+Then it can generate task routing such as:
+
+```txt
+Frontend task -> shared rules + frontend rules + api-client prompt
+Backend task  -> shared rules + backend rules + api-contracts/error-handling prompts
+CMS task      -> shared rules + platform-specific TBDs until enough evidence exists
+Fullstack task -> both sides + contract/update checklist
+```
+
+The important part is not the folder names. It is that each side gets its own rules only when the
+skill has evidence from real files.
+
+See also: [Mixed-stack spec-driven repos](docs/use-cases/mixed-stack-spec-driven.md).
 
 ## Requirements
 
@@ -80,6 +134,24 @@ Three layers, one at a time, each on the cheapest model that fits:
 Templates live in [`templates/`](skills/setup-context-engineering/templates/) and are loaded
 only when a layer needs them, keeping the manifest small.
 
+## How it fits with spec-driven tools
+
+Spec-driven tools help describe **what should be built**. This skill prepares the repository for
+**how agents should safely build it here**.
+
+In practice:
+
+```txt
+Spec / ticket / task
+  -> setup-context-engineering maps the repo's operating context
+  -> AGENTS.md routes the work by stack and task type
+  -> rules/prompts/memory keep implementation aligned with the codebase
+  -> hooks and pr-review create feedback before merge
+```
+
+It does not replace specs, architecture decisions, CI, or human review. It gives those pieces a
+repo-native operating layer agents can actually follow.
+
 ## What it writes to your machine
 
 This skill is transparent by design, but you should know what it does before running it:
@@ -96,6 +168,22 @@ This skill is transparent by design, but you should know what it does before run
 The generated artifacts are yours to edit. The skill leaves `[lowercase]` slots and `TBD`
 markers wherever it lacks evidence — fill those in. To regenerate after the stack changes,
 re-run the skill; it diffs against existing files rather than clobbering them.
+
+## What it is not
+
+- Not a generic prompt pack.
+- Not a replacement for CI.
+- Not a code generator.
+- Not a promise that every repo has clean conventions.
+
+It documents what is real, marks what is unclear, and gives agents a safer operating surface.
+
+## Used in real brownfield workflows
+
+This skill was shaped from repeated use in private product codebases with split backend/frontend
+repos, Electron desktop apps, Go sidecar processes, queue-heavy APIs, and multi-agent review
+flows. The public repository keeps the reusable operating layer while leaving product code,
+customer data, and private implementation details out of scope.
 
 ## License
 
